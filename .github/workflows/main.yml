@@ -1,0 +1,248 @@
+name: DD怪科技
+
+
+on:
+  workflow_dispatch: 
+    inputs:
+      username:
+        description: '账号'
+        required: true
+      password:
+        description: '密码'
+        required: true
+      school:
+        description: '学校'
+        required: true
+      address:
+        description: '详细地址'  # 🌟 新增输入口
+        required: true
+      lon:
+        description: '经度'
+        required: true
+      lat:
+        description: '纬度'
+        required: true
+
+jobs:
+  run-script:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 1. 获取最新代码
+      uses: actions/checkout@v3
+
+    - name: 2. 设置 Python 环境
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: 3. 安装所需依赖
+      run: |
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        pip install pyyaml requests pycryptodome 
+
+    - name: 4. 精准更新 config.yml 配置文件 (跳过百度API拦截)
+      env:
+        INPUT_USERNAME: ${{ github.event.inputs.username }}
+        INPUT_PASSWORD: ${{ github.event.inputs.password }}
+        INPUT_SCHOOL: ${{ github.event.inputs.school }}
+        INPUT_ADDRESS: ${{ github.event.inputs.address }} # 🌟 新增环境变量
+        INPUT_LON: ${{ github.event.inputs.lon }}
+        INPUT_LAT: ${{ github.event.inputs.lat }}
+      run: |
+        python -c "
+        import os
+        import yaml
+
+        # --- 1. 读取现有配置 ---
+        config_path = 'config.yml'
+        if os.path.exists(config_path):
+            with open(config_path, 'r', encoding='utf-8') as f:
+                existing_config = yaml.safe_load(f) or {}
+            print('已加载现有 config.yml')
+        else:
+            existing_config = {}
+
+        # --- 2. 获取传入的参数 ---
+        username = os.environ.get('INPUT_USERNAME')
+        password = os.environ.get('INPUT_PASSWORD')
+        school = os.environ.get('INPUT_SCHOOL')
+        address = os.environ.get('INPUT_ADDRESS')  # 🌟 读取详细地址
+        lon = float(os.environ.get('INPUT_LON'))
+        lat = float(os.environ.get('INPUT_LAT'))
+
+        # --- 3. 双任务独立更新逻辑 ---
+        users = existing_config.get('users') or []
+        
+        found_type_1 = False
+        found_type_2 = False
+
+        for user in users:
+            task_type = user.get('type')
+            if task_type == 1:
+                found_type_1 = True
+            elif task_type == 2:
+                found_type_2 = True
+            
+            # 仅更新必填基础信息，保留所有代理、照片等配置
+            user['username'] = username
+            user['password'] = password
+            user['schoolName'] = school
+            user['address'] = address  # 🌟 写入详细地址
+            user['lon'] = lon
+            user['lat'] = lat
+
+            
+            # 🌟🌟🌟 新增这一行！把你报错日志里的真实 deviceId 锁死！🌟🌟🌟
+            # user['deviceId'] = 'B165F069-7E39-7B5B-2DA5-07B0EC4BFBF8'
+
+        # # 若缺失签到任务则补全
+        # if not found_type_1:
+        #     users.append({
+        #         'type': 1, 'schoolName': school, 'username': username, 'password': password,
+        #         'lon': lon, 'lat': lat, 'address': address, 'signLevel': 1, 'title': 0, 'checkTitle': 0
+        #     })
+            
+        # # 若缺失查寝任务则补全
+        # if not found_type_2:
+        #     users.append({
+        #         'type': 2, 'schoolName': school, 'username': username, 'password': password,
+        #         'lon': lon, 'lat': lat, 'address': address, 'signLevel': 1, 'title': 0, 'checkTitle': 0
+        #     })
+
+        # existing_config['users'] = users
+
+        # --- 4. 写回文件 ---
+        with open(config_path, 'w', encoding='utf-8') as f:
+            yaml.dump(existing_config, f, allow_unicode=True, sort_keys=False)
+        
+        print(f'✅ 配置更新成功！账号、地址 [{address}] 及经纬度已完全写入。')
+        "
+
+    - name: 5. 运行核心打卡脚本
+      run: |
+        python index.py
+# name: DD怪科技自动化运行
+
+# # 触发条件：允许手动运行，或者设定每天定时运行
+# on:
+#   workflow_dispatch: # 核心：保留这个选项，它允许你在页面上手动点击按钮测试
+#     inputs:
+#       username:
+#         description: '账号'
+#         required: true
+#       password:
+#         description: '密码'
+#         required: true
+#       school:
+#         description: '学校'
+#         required: true
+#       address:
+#         description: '详细地址'
+#         required: true
+#   # schedule:
+#   #   - cron: '30 22 * * *' # 取消注释这两行可以开启定时任务（默认每天北京时间早上 6:30 运行）
+
+# jobs:
+#   run-script:
+#     runs-on: ubuntu-latest # 使用免费的轻量级 Linux 云服务器
+
+#     steps:
+#     - name: 1. 获取最新代码
+#       uses: actions/checkout@v3
+
+#     - name: 2. 设置 Python 环境
+#       uses: actions/setup-python@v4
+#       with:
+#         python-version: '3.10' # 设置 Python 版本
+
+#     - name: 3. 安装所需依赖
+#       run: |
+#         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+#         # 如果脚本没有 requirements.txt 但需要特定库，比如 requests，改为：pip install requests
+
+#     - name: 4. 精准更新 config.yml 配置文件 (支持签到+查寝双通道)
+#       env:
+#         INPUT_USERNAME: ${{ github.event.inputs.username }}
+#         INPUT_PASSWORD: ${{ github.event.inputs.password }}
+#         INPUT_SCHOOL: ${{ github.event.inputs.school }}
+#         INPUT_ADDRESS: ${{ github.event.inputs.address }}
+#       run: |
+#         python -c "
+#         import os
+#         import yaml
+#         from liteTools import CpdailyTools
+
+#         # --- 1. 读取现有配置 ---
+#         config_path = 'config.yml'
+#         if os.path.exists(config_path):
+#             with open(config_path, 'r', encoding='utf-8') as f:
+#                 existing_config = yaml.safe_load(f) or {}
+#             print('已加载现有 config.yml')
+#         else:
+#             existing_config = {}
+
+#         # --- 2. 获取传入的参数 ---
+#         username = os.environ.get('INPUT_USERNAME')
+#         password = os.environ.get('INPUT_PASSWORD')
+#         school = os.environ.get('INPUT_SCHOOL')
+#         address = os.environ.get('INPUT_ADDRESS')
+
+#         # --- 3. 获取坐标 ---
+#         try:
+#             lon, lat = CpdailyTools.baiduGeocoding(address)
+#             print(f'坐标获取成功: {lon}, {lat}')
+#         except Exception as e:
+#             print(f'获取坐标失败: {e}')
+#             lon, lat = 0.0, 0.0
+
+#         # --- 4. 🌟 双任务独立更新逻辑 🌟 ---
+#         users = existing_config.get('users') or []
+        
+#         found_type_1 = False
+#         found_type_2 = False
+
+#         # 遍历现有的 users 列表
+#         for user in users:
+#             task_type = user.get('type')
+#             if task_type == 1:
+#                 found_type_1 = True
+#             elif task_type == 2:
+#                 found_type_2 = True
+            
+#             # 只要是已存在的任务，无论签到还是查寝，都更新基础参数
+#             # 绝对不碰 photo, proxy, maxRetry 等个性化字段！
+#             user['username'] = username
+#             user['password'] = password
+#             user['schoolName'] = school
+#             user['address'] = address
+#             user['lon'] = float(lon)
+#             user['lat'] = float(lat)
+
+#         # # 如果原本的配置里完全没有签到任务，自动补全一个基础版
+#         # if not found_type_1:
+#         #     users.append({
+#         #         'type': 1, 'schoolName': school, 'username': username, 'password': password,
+#         #         'lon': float(lon), 'lat': float(lat), 'address': address,
+#         #         'signLevel': 1, 'title': 0, 'checkTitle': 0
+#         #     })
+            
+#         # # 如果原本的配置里完全没有查寝任务（或者被 # 注释掉了），自动补全一个基础版
+#         # if not found_type_2:
+#         #     users.append({
+#         #         'type': 2, 'schoolName': school, 'username': username, 'password': password,
+#         #         'lon': float(lon), 'lat': float(lat), 'address': address,
+#         #         'signLevel': 1, 'title': 0, 'checkTitle': 0
+#         #     })
+
+#         # existing_config['users'] = users
+
+#         # --- 5. 写回文件 ---
+#         with open(config_path, 'w', encoding='utf-8') as f:
+#             yaml.dump(existing_config, f, allow_unicode=True, sort_keys=False)
+        
+#         print('✅ 双通道配置更新完成！你的旧代理和照片配置已安全保留。')
+#         "
+#     # - name: 4. 运行核心脚本
+#     #   run: |
+#     #     python index.py  # ⚠️ 注意：这里的 main.py 必须换成你仓库里的实际执行文件名
