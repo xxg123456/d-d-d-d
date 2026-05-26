@@ -1,0 +1,17 @@
+requests==2.25.1
+requests_toolbelt==0.9.1
+tencentcloud_sdk_python
+urllib3==1.26.5
+beautifulsoup4==4.9.3
+pycryptodome==3.10.1
+pyDes==2.0.1
+PyYAML==6.0.1
+lxml
+rsa==4.7.2
+loguru>=0.6.0
+Pillow>=6.0.0
+numpy>=1.15.0
+apprise==0.9.7
+Flask==2.3.2
+gunicorn==20.1.0
+
